@@ -10,7 +10,7 @@
   const DAY_END = 20 * 60;    // 20:00
   const SLOT = 30;            // grade visual (min)
   const SNAP = 15;            // passo de arraste e seleção (min)
-  const DEFAULT_DURATION = 60;
+  const DEFAULT_DURATION = 30;   // toque curto num horário livre
   const LONG_PRESS_MS = 350;
   const STORAGE_KEY = 'sial2026-meetings-v1';
   const ROOMS = { 1: 'JBS 1', 2: 'JBS 2' };
@@ -298,56 +298,87 @@
     const m = meetings.find((o) => o.id === it.dataset.id); if (m) openForm({ ...m });
   });
 
-  // ---------- Toque na grade / arrastar ----------
+  // ---------- Toque na grade: criar arrastando / mover ----------
+  // Toque curto num horário livre: reunião de 30 min. Segurar e arrastar: define a duração.
+  // Segurar e arrastar uma reunião: move. Com mouse não precisa segurar, basta arrastar.
   const grid = $('#calGrid');
-  let drag = null; // { el, m, timer, startX, startY, lifted, offsetY, moved, target }
-  let suppressClickUntil = 0; // após um toque longo, o clique residual não deve abrir o formulário
   const calScroll = $('#calScroll');
+  let drag = null;
+  let suppressNextClick = false; // após um arraste, o clique residual não deve abrir o formulário
+  const fmtDur = (min) => (min % 60 ? (min > 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`) : `${min / 60} h`);
 
   grid.addEventListener('click', (e) => {
-    if (Date.now() < suppressClickUntil) return;
-    const slot = e.target.closest('.slot');
-    if (slot && !e.target.closest('.event')) {
-      const room = Number(slot.closest('.room-col').dataset.room);
-      const start = Number(slot.dataset.min);
-      if (start >= DAY_END) return;
-      openForm({ room, date: selectedDay, start, end: Math.min(DAY_END, start + DEFAULT_DURATION) });
-      return;
-    }
+    if (suppressNextClick) { suppressNextClick = false; return; }
     const ev = e.target.closest('.event');
-    if (ev) { const m = meetings.find((o) => o.id === ev.dataset.id); if (m) openForm({ ...m }); }
+    if (ev) { const m = meetings.find((o) => o.id === ev.dataset.id); if (m) openForm({ ...m }); return; }
+    const slot = e.target.closest('.slot'); if (!slot) return;
+    const start = Number(slot.dataset.min); if (start >= DAY_END) return;
+    openForm({ room: Number(slot.closest('.room-col').dataset.room), date: selectedDay, start, end: Math.min(DAY_END, start + DEFAULT_DURATION) });
   });
 
   grid.addEventListener('pointerdown', (e) => {
-    const el = e.target.closest('.event'); if (!el) return;
-    const m = meetings.find((o) => o.id === el.dataset.id); if (!m) return;
-    drag = { el, m, startX: e.clientX, startY: e.clientY, lifted: false, moved: false, pointerId: e.pointerId };
-    drag.offsetY = e.clientY - el.getBoundingClientRect().top;
-    drag.timer = setTimeout(() => {
-      if (!drag) return;
-      drag.lifted = true; el.classList.add('is-lifted');
-      try { el.setPointerCapture(e.pointerId); } catch {}
+    suppressNextClick = false;
+    if (drag || e.button > 0) return;
+    const el = e.target.closest('.event');
+    const slot = el ? null : e.target.closest('.slot');
+    if (!el && !slot) return;
+    const col = (el || slot).closest('.room-col');
+    drag = { col, room: Number(col.dataset.room), startX: e.clientX, startY: e.clientY, lifted: false, moved: false };
+    if (el) {
+      const m = meetings.find((o) => o.id === el.dataset.id); if (!m) { drag = null; return; }
+      Object.assign(drag, { mode: 'move', el, m, offsetY: e.clientY - el.getBoundingClientRect().top });
+    } else {
+      const anchor = Number(slot.dataset.min); if (anchor >= DAY_END) { drag = null; return; }
+      Object.assign(drag, { mode: 'create', anchor, start: anchor, end: Math.min(DAY_END, anchor + DEFAULT_DURATION) });
+    }
+    drag.lift = () => {
+      if (!drag || drag.lifted) return;
+      drag.lifted = true; clearTimeout(drag.timer);
+      if (drag.mode === 'move') { drag.el.classList.add('is-lifted'); drag.el.style.touchAction = 'none'; }
+      else {
+        drag.el = document.createElement('div');
+        drag.el.className = `event r${drag.room} is-new`;
+        drag.el.innerHTML = '<span class="ev-time"></span><span class="ev-name">New meeting</span>';
+        col.appendChild(drag.el); paintCreate();
+      }
+      try { col.setPointerCapture(e.pointerId); } catch {}
       if (navigator.vibrate) navigator.vibrate(15);
-      el.style.touchAction = 'none';
-    }, LONG_PRESS_MS);
+    };
+    if (e.pointerType === 'mouse') drag.liftOnMove = true;     // mouse: arrasta direto
+    else drag.timer = setTimeout(drag.lift, LONG_PRESS_MS);     // dedo: segurar para não confundir com rolagem
   });
+
+  function paintCreate() {
+    const d = drag; const h = minToPx(d.end) - minToPx(d.start);
+    d.el.style.top = `${minToPx(d.start)}px`; d.el.style.height = `${h - 3}px`;
+    d.el.classList.toggle('short', h < 46);
+    d.el.querySelector('.ev-time').textContent = `${fmtTime(d.start)} – ${fmtTime(d.end)} · ${fmtDur(d.end - d.start)}`;
+  }
 
   grid.addEventListener('pointermove', (e) => {
     if (!drag) return;
-    const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
     if (!drag.lifted) {
-      if (Math.hypot(dx, dy) > 8) { clearTimeout(drag.timer); drag = null; } // virou rolagem/tap longo cancelado
+      if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > 8) {
+        if (drag.liftOnMove) drag.lift(); else { clearTimeout(drag.timer); drag = null; } // dedo deslizou: é rolagem
+      }
       return;
     }
     e.preventDefault();
     drag.moved = true;
-    drag.el.classList.add('is-dragging');
     // rola a grade quando o dedo chega perto da borda de cima ou de baixo
     const sr = calScroll.getBoundingClientRect();
     if (e.clientY < sr.top + 60) calScroll.scrollTop -= 12;
     else if (e.clientY > sr.bottom - 60) calScroll.scrollTop += 12;
+
+    if (drag.mode === 'create') {
+      const pm = pxToMin(e.clientY - drag.col.getBoundingClientRect().top);
+      if (pm >= drag.anchor) { drag.start = drag.anchor; drag.end = clamp(Math.round(pm / SNAP) * SNAP, drag.anchor + SLOT, DAY_END); }
+      else { drag.end = Math.min(DAY_END, drag.anchor + SLOT); drag.start = clamp(Math.round(pm / SNAP) * SNAP, DAY_START, drag.anchor); }
+      paintCreate();
+      return;
+    }
+    drag.el.classList.add('is-dragging');
     const target = computeDrop(e.clientX, e.clientY);
-    if (!target) return;
     drag.target = target;
     const col = grid.querySelector(`.room-col[data-room="${target.room}"]`);
     if (drag.el.parentElement !== col) col.appendChild(drag.el);
@@ -368,13 +399,18 @@
     return { room: Number(col.dataset.room), start };
   }
 
-  function endDrag(e) {
+  function endDrag() {
     if (!drag) return;
     clearTimeout(drag.timer);
     const d = drag; drag = null;
+    if (!d.lifted) return; // toque curto: o evento "click" cuida
+    suppressNextClick = true;
+    if (d.mode === 'create') {
+      d.el.remove();
+      openForm({ room: d.room, date: selectedDay, start: d.start, end: d.end });
+      return;
+    }
     d.el.classList.remove('is-lifted', 'is-dragging'); d.el.style.touchAction = '';
-    if (!d.lifted) return;
-    suppressClickUntil = Date.now() + 300;
     if (!d.moved || !d.target || (d.target.room === d.m.room && d.target.start === d.m.start)) { render(); return; }
     const moved = { ...d.m, room: d.target.room, start: d.target.start, end: d.target.start + (d.m.end - d.m.start) };
     const c = conflict(moved);
@@ -394,7 +430,7 @@
   grid.addEventListener('pointercancel', endDrag);
   // no touch, impede a rolagem da página só depois que a reunião foi "levantada"
   grid.addEventListener('touchmove', (e) => { if (drag && drag.lifted) e.preventDefault(); }, { passive: false });
-  grid.addEventListener('contextmenu', (e) => { if (e.target.closest('.event')) e.preventDefault(); });
+  grid.addEventListener('contextmenu', (e) => { if (e.target.closest('.event, .slot')) e.preventDefault(); });
 
   // ---------- Backup / restauração ----------
   $('#btnExport').addEventListener('click', () => {

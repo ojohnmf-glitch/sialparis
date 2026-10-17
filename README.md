@@ -3,7 +3,8 @@
 Site simples para a promotora controlar a agenda das salas **JBS 1** (azul) e **JBS 2** (laranja) durante o evento, de 17 a 21 de outubro, das 8h às 20h. Feito para uso em tablet.
 
 ## Como usar
-- **Adicionar reunião**: botão no topo ou toque em um horário livre na grade.
+- **Adicionar reunião**: toque rápido em um horário livre cria uma reunião de 30 min. Para definir a duração, segure o dedo no horário de início e arraste para baixo: a prévia mostra o horário e a duração enquanto você arrasta. O botão "Add meeting" no topo também funciona.
+- Com mouse (computador), basta clicar e arrastar, sem segurar.
 - **Editar / excluir**: toque na reunião.
 - **Mover**: segure a reunião por meio segundo e arraste (para outro horário ou para a outra sala). Perto da borda de cima ou de baixo a grade rola sozinha. Confirme antes de salvar.
 - **Ambas / JBS 1 / JBS 2**: filtra a visualização por sala.

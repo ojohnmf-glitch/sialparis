@@ -454,10 +454,7 @@
   });
 
   // ---------- Início ----------
-  if (window.innerWidth < 600) {
-    roomFilter = '1';
-    $('#roomFilter').querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', c.dataset.room === '1'));
-  }
+  // abre sempre com as duas salas lado a lado, em qualquer tamanho de tela
   render();
   // rola para o horário atual (ou 8h) e atualiza a linha "agora"
   const scrollTo = selectedDay === todayIso() ? clamp(nowMin() - 60, DAY_START, DAY_END) : DAY_START;

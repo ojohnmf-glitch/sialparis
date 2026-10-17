@@ -1,4 +1,5 @@
 -- Cole este arquivo inteiro no SQL Editor do Supabase e clique em "Run".
+-- Pode ser executado mais de uma vez sem problema.
 
 create table if not exists public.meetings (
   id         text primary key,
@@ -35,5 +36,17 @@ create policy "sial_write"  on public.meetings for insert with check (true);
 create policy "sial_update" on public.meetings for update using (true);
 create policy "sial_delete" on public.meetings for delete using (true);
 
--- Tempo real: avisa os outros aparelhos a cada mudança.
-alter publication supabase_realtime add table public.meetings;
+-- Tempo real: avisa os outros aparelhos a cada mudança (ignora se já estiver ativo).
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'meetings'
+  ) then
+    alter publication supabase_realtime add table public.meetings;
+  end if;
+end $$;
+
+-- Conferência: deve retornar 1 linha com a tabela e "realtime = true".
+select 'meetings' as tabela,
+  exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'meetings') as realtime;

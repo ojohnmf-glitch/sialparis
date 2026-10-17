@@ -1,6 +1,6 @@
-/* Agenda de Salas – SIAL Paris 2026
-   Site estático: os dados ficam salvos no navegador deste aparelho (localStorage).
-   Use "Backup" / "Restaurar" para levar a agenda a outro aparelho. */
+/* Room Scheduler – SIAL Paris 2026
+   Site estático. Dados no Supabase quando assets/config.js está preenchido
+   (compartilhado entre aparelhos, em tempo real); senão, no localStorage deste aparelho. */
 (() => {
   'use strict';
 
@@ -26,8 +26,9 @@
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const pad = (n) => String(n).padStart(2, '0');
   const fmtTime = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
-  const fmtDate = (iso) => { const d = new Date(iso + 'T12:00:00'); return `${DOW[d.getDay()]}, Oct ${d.getDate()}`; };
-  const fmtDateLong = (iso) => { const d = new Date(iso + 'T12:00:00'); return `${DOW_LONG[d.getDay()]}, October ${d.getDate()}`; };
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const fmtDate = (iso) => { const d = new Date(iso + 'T12:00:00'); return `${DOW[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
+  const fmtDateLong = (iso) => { const d = new Date(iso + 'T12:00:00'); return `${DOW_LONG[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
   const hourPx = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hour'));
   const minToPx = (m) => (m - DAY_START) / 60 * hourPx();
   const pxToMin = (px) => DAY_START + px / hourPx() * 60;
@@ -47,7 +48,8 @@
     ? window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey) : null;
   const toRow = (m) => ({ id: m.id, room: m.room, date: m.date, start_min: m.start, end_min: m.end, name: m.name, people: m.people, bu: m.bu, company: m.company, updated_at: new Date().toISOString() });
   const fromRow = (r) => ({ id: r.id, room: Number(r.room), date: r.date, start: Number(r.start_min), end: Number(r.end_min), name: r.name, people: Number(r.people), bu: r.bu || '', company: r.company || '' });
-  function setSync(state, text) { const el = $('#syncStatus'); if (!el) return; el.className = 'sync ' + state; el.textContent = '● ' + text; }
+  let live = false, wasOffline = false;
+  function setSync(state, text) { const el = $('#syncStatus'); el.className = 'sync ' + state; el.querySelector('.sync-text').textContent = text; }
 
   const localStore = {
     async load() { try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } },
@@ -60,7 +62,7 @@
     async load() {
       const { data, error } = await sb.from('meetings').select('*');
       if (error) throw error;
-      setSync('ok', 'synced'); return data.map(fromRow);
+      setSync('ok', live ? 'synced · live' : 'synced'); return data.map(fromRow);
     },
     async upsert(m) {
       const { error } = await sb.from('meetings').upsert(toRow(m));
@@ -77,19 +79,25 @@
     },
     subscribe(onChange) {
       sb.channel('meetings-live').on('postgres_changes', { event: '*', schema: 'public', table: 'meetings' }, onChange)
-        .subscribe((status) => { if (status === 'SUBSCRIBED') setSync('ok', 'synced · live'); });
+        .subscribe((status) => { live = status === 'SUBSCRIBED'; if (live) setSync('ok', 'synced · live'); });
       setInterval(onChange, 30 * 1000); // rede de segurança caso o tempo real caia
     },
   };
   const store = sb ? remoteStore : localStore;
 
   async function refresh() {
-    try { meetings = await store.load(); render(); }
-    catch (e) { console.error(e); setSync('err', 'offline'); toast('Could not load the schedule. Check your connection.'); }
+    try {
+      meetings = await store.load(); render();
+      if (wasOffline) { wasOffline = false; toast('Back online'); }
+    } catch (e) {
+      console.error(e); setSync('err', 'offline');
+      if (!wasOffline) toast('Could not load the schedule. Check the Wi-Fi.');
+      wasOffline = true;
+    }
   }
   function friendlyError(e) {
     const msg = String(e && (e.message || e)) || '';
-    if (/meetings_no_overlap|exclusion/i.test(msg)) return 'That slot was just booked from another device.';
+    if ((e && e.code === '23P01') || /meetings_no_overlap|exclusion/i.test(msg)) return 'That slot was just booked from another device.';
     return 'Could not save. Check your connection and try again.';
   }
   function conflict(m) {
@@ -116,7 +124,7 @@
       const n = meetings.filter((m) => m.date === d).length;
       return `<button class="day-tab ${d === selectedDay ? 'is-active' : ''} ${d === t ? 'is-today' : ''}" data-day="${d}">
         <span class="dow">${DOW[dt.getDay()]}</span><span class="dom">${dt.getDate()}</span>
-        ${n ? `<span class="dow">${n} mtg${n > 1 ? 's' : ''}</span>` : ''}</button>`;
+        <span class="dow">${n ? `${n} mtg${n > 1 ? 's' : ''}` : 'free'}</span></button>`;
     }).join('');
   }
 
@@ -145,7 +153,7 @@
       html += `<div class="slot" style="top:${minToPx(DAY_END)}px;height:0"></div>`;
       meetings.filter((mt) => mt.date === selectedDay && mt.room === r).sort((a, b) => a.start - b.start).forEach((mt) => {
         const h = minToPx(mt.end) - minToPx(mt.start);
-        html += `<div class="event r${r} ${h < 46 ? 'short' : ''} ${isPast(mt) ? 'past' : ''}" data-id="${mt.id}" style="top:${minToPx(mt.start)}px;height:${h - 3}px">
+        html += `<div class="event r${r} ${h < 46 ? 'short' : ''} ${isPast(mt) ? 'past' : ''}" data-id="${esc(mt.id)}" style="top:${minToPx(mt.start)}px;height:${h - 3}px">
           <span class="ev-time">${fmtTime(mt.start)} – ${fmtTime(mt.end)}</span>
           <span class="ev-name">${esc(mt.name)}</span>
           <span class="ev-meta">${esc(mt.bu)} · ${mt.people} ${mt.people > 1 ? 'people' : 'person'}${mt.company ? ' · ' + esc(mt.company) : ''}</span>
@@ -167,7 +175,7 @@
     const items = meetings.filter((m) => m.date === selectedDay && rooms.includes(m.room)).sort((a, b) => a.start - b.start || a.room - b.room);
     $('#listView').innerHTML = `<div class="list-day-title">${fmtDateLong(selectedDay)}</div>` +
       (items.length ? items.map((m) => `
-        <div class="list-item r${m.room} ${isPast(m) ? 'past' : ''}" data-id="${m.id}">
+        <div class="list-item r${m.room} ${isPast(m) ? 'past' : ''}" data-id="${esc(m.id)}">
           <div class="li-time">${fmtTime(m.start)}<small>to ${fmtTime(m.end)}</small></div>
           <div><div class="li-name">${esc(m.name)}</div>
             <div class="li-meta">${esc(m.bu)} · ${m.people} ${m.people > 1 ? 'people' : 'person'}${m.company ? ' · with ' + esc(m.company) : ''}</div></div>
@@ -186,23 +194,26 @@
 
   // ---------- Formulário ----------
   const form = $('#form');
-  function fillTimeSelects() {
-    let opts = '';
-    for (let m = DAY_START; m <= DAY_END; m += SNAP) opts += `<option value="${m}">${fmtTime(m)}</option>`;
-    $('#fStart').innerHTML = opts; $('#fEnd').innerHTML = opts;
-    $('#fDate').innerHTML = EVENT_DAYS.map((d) => `<option value="${d}">${fmtDate(d)}</option>`).join('');
+  const timeOptions = (from, to) => { let o = ''; for (let m = from; m <= to; m += SNAP) o += `<option value="${m}">${fmtTime(m)}</option>`; return o; };
+  let formStart = DAY_START; // início atual do formulário, para manter a duração ao trocá-lo
+  function setTimes(start, end) {
+    start = clamp(Math.round(start / SNAP) * SNAP, DAY_START, DAY_END - SNAP);
+    formStart = start;
+    end = clamp(Math.round(end / SNAP) * SNAP, start + SNAP, DAY_END);
+    $('#fStart').innerHTML = timeOptions(DAY_START, DAY_END - SNAP); $('#fStart').value = start;
+    $('#fEnd').innerHTML = timeOptions(start + SNAP, DAY_END); $('#fEnd').value = end;   // só horários válidos
   }
-  function fillBuList() {
-    const cur = $('#fBu').value;
-    $('#fBu').innerHTML = '<option value="">Select…</option>' + DEFAULT_BUS.map((b) => `<option value="${esc(b)}">${esc(b)}</option>`).join('');
-    $('#fBu').value = cur;
+  function fillBuList(extra) {
+    const list = extra && !DEFAULT_BUS.includes(extra) ? [...DEFAULT_BUS, extra] : DEFAULT_BUS;
+    $('#fBu').innerHTML = '<option value="">Select…</option>' + list.map((b) => `<option value="${esc(b)}">${esc(b)}</option>`).join('');
   }
+  $('#fDate').innerHTML = EVENT_DAYS.map((d) => `<option value="${d}">${fmtDate(d)}</option>`).join('');
   function setRoom(r) {
     $('#fRoom').value = r;
     $('#fRoomSeg').querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b.dataset.room == r));
   }
   function openForm(data) {
-    fillBuList();
+    fillBuList(data.bu);
     const editing = !!data.id;
     $('#modalTitle').textContent = editing ? 'Edit meeting' : 'Add meeting';
     $('#btnDelete').classList.toggle('hidden', !editing);
@@ -210,13 +221,11 @@
     setRoom(data.room || 1);
     $('#fName').value = data.name || '';
     $('#fPeople').value = data.people || 2;
-    if (data.bu && !DEFAULT_BUS.includes(data.bu)) $('#fBu').insertAdjacentHTML('beforeend', `<option value="${esc(data.bu)}">${esc(data.bu)}</option>`);
     $('#fBu').value = data.bu || '';
     $('#fCompany').value = data.company || '';
     $('#fDate').value = data.date || selectedDay;
-    const start = clamp(data.start ?? DAY_START + 60, DAY_START, DAY_END - SNAP);
-    $('#fStart').value = start;
-    $('#fEnd').value = clamp(data.end ?? start + DEFAULT_DURATION, start + SNAP, DAY_END);
+    const start = data.start ?? DAY_START + 60;
+    setTimes(start, data.end ?? start + DEFAULT_DURATION);
     $('#formError').classList.add('hidden');
     $('#modal').classList.remove('hidden');
     if (!editing) setTimeout(() => $('#fName').focus(), 50);
@@ -239,7 +248,6 @@
     };
     if (!m.name) return showError('Please enter the person\'s name.');
     if (!m.bu) return showError('Please enter the Business Unit.');
-    if (m.end <= m.start) return showError('End time must be after start time.');
     const c = conflict(m);
     if (c) return showError(`Conflict: ${ROOMS[m.room]} already has "${c.name}" from ${fmtTime(c.start)} to ${fmtTime(c.end)}.`);
     const idx = meetings.findIndex((o) => o.id === m.id);
@@ -266,14 +274,14 @@
   });
   $('#btnClose').addEventListener('click', closeForm);
   $('#btnCancel').addEventListener('click', closeForm);
-  $('#modal').addEventListener('click', (e) => { if (e.target === $('#modal')) closeForm(); });
   $('#fRoomSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setRoom(b.dataset.room); });
   $('#fPeopleMinus').addEventListener('click', () => { const i = $('#fPeople'); i.value = Math.max(1, (parseInt(i.value, 10) || 1) - 1); });
   $('#fPeoplePlus').addEventListener('click', () => { const i = $('#fPeople'); i.value = Math.min(99, (parseInt(i.value, 10) || 0) + 1); });
   $('#fStart').addEventListener('change', () => {
-    const s = Number($('#fStart').value), e = Number($('#fEnd').value);
-    if (e <= s) $('#fEnd').value = Math.min(DAY_END, s + DEFAULT_DURATION);
+    const s = Number($('#fStart').value), dur = Number($('#fEnd').value) - formStart;
+    setTimes(s, s + (dur > 0 ? dur : DEFAULT_DURATION));
   });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeForm(); $('#confirmModal').classList.add('hidden'); } });
 
   // ---------- Navegação ----------
   $('#dayTabs').addEventListener('click', (e) => { const b = e.target.closest('.day-tab'); if (b) { selectedDay = b.dataset.day; render(); } });
@@ -292,10 +300,12 @@
 
   // ---------- Toque na grade / arrastar ----------
   const grid = $('#calGrid');
-  let drag = null; // { el, m, timer, startX, startY, lifted, offsetY, moved }
+  let drag = null; // { el, m, timer, startX, startY, lifted, offsetY, moved, target }
+  let suppressClickUntil = 0; // após um toque longo, o clique residual não deve abrir o formulário
+  const calScroll = $('#calScroll');
 
   grid.addEventListener('click', (e) => {
-    if (drag && drag.moved) return;
+    if (Date.now() < suppressClickUntil) return;
     const slot = e.target.closest('.slot');
     if (slot && !e.target.closest('.event')) {
       const room = Number(slot.closest('.room-col').dataset.room);
@@ -332,6 +342,10 @@
     e.preventDefault();
     drag.moved = true;
     drag.el.classList.add('is-dragging');
+    // rola a grade quando o dedo chega perto da borda de cima ou de baixo
+    const sr = calScroll.getBoundingClientRect();
+    if (e.clientY < sr.top + 60) calScroll.scrollTop -= 12;
+    else if (e.clientY > sr.bottom - 60) calScroll.scrollTop += 12;
     const target = computeDrop(e.clientX, e.clientY);
     if (!target) return;
     drag.target = target;
@@ -360,13 +374,12 @@
     const d = drag; drag = null;
     d.el.classList.remove('is-lifted', 'is-dragging'); d.el.style.touchAction = '';
     if (!d.lifted) return;
-    // depois de um toque longo, o clique residual não deve abrir o formulário
-    drag = { moved: true }; setTimeout(() => { if (drag && !drag.el) drag = null; }, 0);
+    suppressClickUntil = Date.now() + 300;
     if (!d.moved || !d.target || (d.target.room === d.m.room && d.target.start === d.m.start)) { render(); return; }
     const moved = { ...d.m, room: d.target.room, start: d.target.start, end: d.target.start + (d.m.end - d.m.start) };
     const c = conflict(moved);
     if (c) { render(); toast(`Slot in ${ROOMS[moved.room]} is taken by ${c.name}`); return; }
-    $('#confirmText').innerHTML = `<b style="color:inherit">${esc(d.m.name)}</b> will move to <strong>${ROOMS[moved.room]}</strong>, ${fmtTime(moved.start)} – ${fmtTime(moved.end)}.`;
+    $('#confirmText').innerHTML = `<strong>${esc(d.m.name)}</strong> will move to <strong>${ROOMS[moved.room]}</strong>, ${fmtTime(moved.start)} – ${fmtTime(moved.end)}.`;
     $('#confirmModal').classList.remove('hidden');
     $('#confirmYes').onclick = async () => {
       const idx = meetings.findIndex((o) => o.id === moved.id); const prev = meetings[idx];
@@ -379,6 +392,8 @@
   }
   grid.addEventListener('pointerup', endDrag);
   grid.addEventListener('pointercancel', endDrag);
+  // no touch, impede a rolagem da página só depois que a reunião foi "levantada"
+  grid.addEventListener('touchmove', (e) => { if (drag && drag.lifted) e.preventDefault(); }, { passive: false });
   grid.addEventListener('contextmenu', (e) => { if (e.target.closest('.event')) e.preventDefault(); });
 
   // ---------- Backup / restauração ----------
@@ -392,7 +407,8 @@
     try {
       const data = JSON.parse(await f.text());
       if (!Array.isArray(data)) throw new Error();
-      if (!confirm(`Replace the current schedule with ${data.length} meeting(s) from this file?`)) return;
+      const scope = sb ? ' on ALL devices' : '';
+      if (!confirm(`Replace the current schedule${scope} with ${data.length} meeting(s) from this file?`)) return;
       const list = data.filter((m) => m && m.id && ROOMS[m.room] && EVENT_DAYS.includes(m.date));
       await store.replaceAll(list); meetings = list; render(); toast('Schedule restored');
       if (sb) refresh();
@@ -405,7 +421,6 @@
     roomFilter = '1';
     $('#roomFilter').querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', c.dataset.room === '1'));
   }
-  fillTimeSelects();
   render();
   // rola para o horário atual (ou 8h) e atualiza a linha "agora"
   const scrollTo = selectedDay === todayIso() ? clamp(nowMin() - 60, DAY_START, DAY_END) : DAY_START;
@@ -414,5 +429,6 @@
 
   if (sb) setSync('', 'connecting…'); else setSync('', 'this device only');
   refresh().then(() => store.subscribe(() => { if (!drag && $('#modal').classList.contains('hidden')) refresh(); }));
-  window.addEventListener('focus', () => { if (sb) refresh(); });
+  // ao voltar para o app (trocar de aba, destravar o tablet), recarrega
+  document.addEventListener('visibilitychange', () => { if (sb && document.visibilityState === 'visible' && !drag) refresh(); });
 })();

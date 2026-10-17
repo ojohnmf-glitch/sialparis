@@ -15,7 +15,7 @@
     <div class="brand">
       <span class="brand-title">Room Scheduler</span>
       <span class="brand-sub">SIAL Paris · October 17–21</span>
-      <span class="sync" id="syncStatus" title="Sync status">● this device only</span>
+      <span class="sync" id="syncStatus" title="Sync status"><i class="dot"></i><span class="sync-text">this device only</span></span>
     </div>
 
     <nav class="days" id="dayTabs" aria-label="Event days"></nav>
@@ -48,7 +48,7 @@
         <button class="btn-x" id="btnClose" aria-label="Close">✕</button>
       </div>
 
-      <form id="form" autocomplete="off">
+      <form id="form" autocomplete="off" novalidate>
         <input type="hidden" id="fId">
 
         <label class="field">
@@ -61,13 +61,13 @@
         </label>
 
         <label class="field">
-          <span>Booked by (name) <b>*</b></span>
+          <span>Booked by (name) <span class="req">*</span></span>
           <input type="text" id="fName" required placeholder="Person booking the meeting" maxlength="80">
         </label>
 
         <div class="row">
           <label class="field">
-            <span>Number of people <b>*</b></span>
+            <span>Number of people <span class="req">*</span></span>
             <div class="stepper">
               <button type="button" id="fPeopleMinus" aria-label="Fewer">−</button>
               <input type="number" id="fPeople" min="1" max="99" value="2" required inputmode="numeric">
@@ -75,7 +75,7 @@
             </div>
           </label>
           <label class="field">
-            <span>Business Unit <b>*</b></span>
+            <span>Business Unit <span class="req">*</span></span>
             <select id="fBu" required></select>
           </label>
         </div>
@@ -87,15 +87,15 @@
 
         <div class="row">
           <label class="field">
-            <span>Date <b>*</b></span>
+            <span>Date <span class="req">*</span></span>
             <select id="fDate" required></select>
           </label>
           <label class="field">
-            <span>Start <b>*</b></span>
+            <span>Start <span class="req">*</span></span>
             <select id="fStart" required></select>
           </label>
           <label class="field">
-            <span>End <b>*</b></span>
+            <span>End <span class="req">*</span></span>
             <select id="fEnd" required></select>
           </label>
         </div>
@@ -133,7 +133,7 @@
     <span class="hint">Tap a free slot to book · Tap a meeting to edit · Press and hold to move</span>
   </footer>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+  <script src="assets/vendor/supabase.js"></script>
   <script src="assets/config.js"></script>
   <script src="assets/app.js"></script>
 </body>

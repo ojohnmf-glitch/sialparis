@@ -17,7 +17,7 @@ body {
   touch-action: manipulation;
 }
 .hidden { display: none !important; }
-b { color: var(--danger); font-weight: 600; }
+.req { color: var(--danger); font-weight: 600; }
 small { color: var(--muted); font-weight: 400; }
 
 /* ---------- Topbar ---------- */
@@ -118,7 +118,7 @@ small { color: var(--muted); font-weight: 400; }
   color: #fff; overflow: hidden; cursor: pointer; z-index: 2;
   box-shadow: 0 1px 2px rgba(0,0,0,.15); user-select: none; -webkit-user-select: none;
   display: flex; flex-direction: column; gap: 2px; line-height: 1.2;
-  touch-action: pan-y;
+  touch-action: pan-y; -webkit-touch-callout: none;
 }
 .event.r1 { background: var(--r1); border-left: 5px solid var(--r1-dark); }
 .event.r2 { background: var(--r2); border-left: 5px solid var(--r2-dark); }
@@ -140,6 +140,7 @@ small { color: var(--muted); font-weight: 400; }
   background: var(--card); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px;
   border-left: 6px solid; cursor: pointer;
 }
+.list-item.past { opacity: .55; }
 .list-item.r1 { border-color: var(--r1); }
 .list-item.r2 { border-color: var(--r2); }
 .list-item .li-time { font-weight: 700; font-size: 18px; }
@@ -230,8 +231,13 @@ small { color: var(--muted); font-weight: 400; }
   .room-head { font-size: 15px; margin-right: 4px; }
 }
 
-/* estado de sincronização */
-.sync { font-size: 12px; color: var(--muted); }
-.sync.ok { color: #16a34a; }
-.sync.err { color: var(--danger); }
-@media (max-width: 820px) { .sync { display: none; } }
+/* estado de sincronização: bolinha sempre visível, texto só em telas largas */
+.sync { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
+.sync .dot { width: 9px; height: 9px; border-radius: 50%; background: #9ca3af; display: inline-block; }
+.sync.ok .dot { background: #16a34a; }
+.sync.err .dot { background: var(--danger); }
+.sync.err { color: var(--danger); font-weight: 600; }
+@media (max-width: 820px) {
+  .brand { flex-direction: row; align-items: center; gap: 8px; }
+  .sync-text { display: none; }
+}

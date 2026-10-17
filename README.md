@@ -5,7 +5,7 @@ Site simples para a promotora controlar a agenda das salas **JBS 1** (azul) e **
 ## Como usar
 - **Adicionar reunião**: botão no topo ou toque em um horário livre na grade.
 - **Editar / excluir**: toque na reunião.
-- **Mover**: segure a reunião por meio segundo e arraste (para outro horário ou para a outra sala). Confirme antes de salvar.
+- **Mover**: segure a reunião por meio segundo e arraste (para outro horário ou para a outra sala). Perto da borda de cima ou de baixo a grade rola sozinha. Confirme antes de salvar.
 - **Ambas / JBS 1 / JBS 2**: filtra a visualização por sala.
 - **Lista**: visão em lista do dia, boa para conferir rápido.
 - **Backup / Restaurar**: baixa ou carrega um arquivo com toda a agenda.
@@ -26,4 +26,4 @@ Dois modos, escolhidos automaticamente:
 A chave "anon" é pública por desenho: qualquer pessoa com o link do site pode ver e editar a agenda. Para um evento de 5 dias com link interno isso é aceitável. Se quiser restringir, o próximo passo é login por e-mail no Supabase.
 
 ## Publicar
-É um site estático: `index.html` + `assets/`. Basta ativar o GitHub Pages neste repositório (Settings → Pages → Deploy from branch) ou hospedar os arquivos em qualquer servidor.
+É um site estático: `index.html` + `assets/` (a biblioteca do Supabase está em `assets/vendor/`, sem dependência de CDN). Basta ativar o GitHub Pages neste repositório (Settings → Pages → Deploy from branch) ou hospedar os arquivos em qualquer servidor.

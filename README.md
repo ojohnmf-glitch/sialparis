@@ -9,7 +9,7 @@ Site simples para a promotora controlar a agenda das salas **JBS 1** (azul) e **
 - **Mover**: segure a reunião por meio segundo e arraste (para outro horário ou para a outra sala). Perto da borda de cima ou de baixo a grade rola sozinha. Confirme antes de salvar.
 - **Ambas / JBS 1 / JBS 2**: filtra a visualização por sala.
 - **Lista**: visão em lista do dia, boa para conferir rápido.
-- **Backup / Restaurar**: baixa ou carrega um arquivo com toda a agenda.
+- **Backup / Restaurar**: ficam ocultos para não serem clicados por engano. Para usar, abra o site com `?admin` no final do endereço (ex.: `https://ojohnmf-glitch.github.io/sialparis/?admin`).
 
 ## Onde ficam os dados
 Dois modos, escolhidos automaticamente:

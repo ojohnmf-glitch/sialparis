@@ -128,8 +128,10 @@
   <div class="toast hidden" id="toast"></div>
 
   <footer class="footbar">
-    <button class="btn btn-ghost btn-sm" id="btnExport">⬇ Backup</button>
-    <label class="btn btn-ghost btn-sm">⬆ Restore<input type="file" id="fileImport" accept="application/json" hidden></label>
+    <div class="admin-tools hidden" id="adminTools">
+      <button class="btn btn-ghost btn-sm" id="btnExport">⬇ Backup</button>
+      <label class="btn btn-ghost btn-sm">⬆ Restore<input type="file" id="fileImport" accept="application/json" hidden></label>
+    </div>
     <span class="hint">Tap a free slot: 30-min meeting · Hold and drag down: set the length · Tap a meeting to edit · Hold and drag a meeting to move it</span>
   </footer>
 

@@ -432,7 +432,8 @@
   grid.addEventListener('touchmove', (e) => { if (drag && drag.lifted) e.preventDefault(); }, { passive: false });
   grid.addEventListener('contextmenu', (e) => { if (e.target.closest('.event, .slot')) e.preventDefault(); });
 
-  // ---------- Backup / restauração ----------
+  // ---------- Backup / restauração (só com ?admin no endereço, para ninguém clicar por engano) ----------
+  if (new URLSearchParams(location.search).has('admin')) $('#adminTools').classList.remove('hidden');
   $('#btnExport').addEventListener('click', () => {
     const blob = new Blob([JSON.stringify(meetings, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);

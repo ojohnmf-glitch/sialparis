@@ -1,6 +1,6 @@
 :root {
-  --r1: #2563eb; --r1-soft: #dbeafe; --r1-dark: #1d4ed8;
-  --r2: #f97316; --r2-soft: #ffedd5; --r2-dark: #c2410c;
+  --r1: #2563eb; --r1-soft: #dbeafe; --r1-dark: #1d4ed8; --r1-bg: #eff5ff; --r1-line: #cfe0fb;
+  --r2: #f97316; --r2-soft: #ffedd5; --r2-dark: #c2410c; --r2-bg: #fff6ee; --r2-line: #fbdcc4;
   --bg: #f3f4f6; --card: #ffffff; --text: #111827; --muted: #6b7280; --line: #e5e7eb;
   --danger: #dc2626;
   --hour: 96px;            /* altura de 1 hora na grade */
@@ -90,6 +90,12 @@ small { color: var(--muted); font-weight: 400; }
   position: absolute; right: 8px; transform: translateY(-50%); font-size: 13px; color: var(--muted); font-weight: 600;
 }
 .room-col { position: relative; border-left: 1px solid var(--line); }
+.room-col.r1 { background: var(--r1-bg); }
+.room-col.r2 { background: var(--r2-bg); }
+.room-col.r1 .slot { border-top-color: var(--r1-line); }
+.room-col.r2 .slot { border-top-color: var(--r2-line); }
+.room-col.r1 .slot.half { border-top-color: #e3edfc; }
+.room-col.r2 .slot.half { border-top-color: #fde9d9; }
 .slot {
   position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); cursor: pointer;
 }
@@ -97,6 +103,8 @@ small { color: var(--muted); font-weight: 400; }
 .slot:active { background: rgba(0,0,0,.04); }
 .room-col.r1 .slot:active { background: var(--r1-soft); }
 .room-col.r2 .slot:active { background: var(--r2-soft); }
+.list-item.r1 { background: var(--r1-bg); }
+.list-item.r2 { background: var(--r2-bg); }
 
 .now-line {
   position: absolute; left: var(--time-col); right: 0; height: 2px; background: var(--danger); z-index: 3; pointer-events: none;

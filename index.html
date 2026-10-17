@@ -1,33 +1,33 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#1f2937">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Agenda de Salas – SIAL Paris 2026</title>
+  <title>Room Scheduler – SIAL Paris 2026</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='48' height='100' fill='%232563eb' rx='10'/><rect x='52' width='48' height='100' fill='%23f97316' rx='10'/></svg>">
   <link rel="stylesheet" href="assets/styles.css">
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="brand-title">Agenda de Salas</span>
-      <span class="brand-sub">SIAL Paris · 17 a 21 de outubro</span>
-      <span class="sync" id="syncStatus" title="Estado da sincronização">● só neste aparelho</span>
+      <span class="brand-title">Room Scheduler</span>
+      <span class="brand-sub">SIAL Paris · October 17–21</span>
+      <span class="sync" id="syncStatus" title="Sync status">● this device only</span>
     </div>
 
-    <nav class="days" id="dayTabs" aria-label="Dias do evento"></nav>
+    <nav class="days" id="dayTabs" aria-label="Event days"></nav>
 
     <div class="topbar-actions">
-      <div class="room-filter" id="roomFilter" role="tablist" aria-label="Salas">
-        <button class="chip chip-both is-active" data-room="all" role="tab">Ambas</button>
+      <div class="room-filter" id="roomFilter" role="tablist" aria-label="Rooms">
+        <button class="chip chip-both is-active" data-room="all" role="tab">Both</button>
         <button class="chip chip-r1" data-room="1" role="tab">JBS 1</button>
         <button class="chip chip-r2" data-room="2" role="tab">JBS 2</button>
       </div>
-      <button class="btn btn-ghost" id="btnList" title="Ver como lista"><span class="ico">☰</span><span class="long"> Lista</span></button>
-      <button class="btn btn-primary" id="btnAdd">＋<span class="long"> Adicionar reunião</span></button>
+      <button class="btn btn-ghost" id="btnList" title="View as list"><span class="ico">☰</span><span class="long"> List</span></button>
+      <button class="btn btn-primary" id="btnAdd">＋<span class="long"> Add meeting</span></button>
     </div>
   </header>
 
@@ -44,15 +44,15 @@
   <div class="modal hidden" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-card">
       <div class="modal-head">
-        <h2 id="modalTitle">Adicionar reunião</h2>
-        <button class="btn-x" id="btnClose" aria-label="Fechar">✕</button>
+        <h2 id="modalTitle">Add meeting</h2>
+        <button class="btn-x" id="btnClose" aria-label="Close">✕</button>
       </div>
 
       <form id="form" autocomplete="off">
         <input type="hidden" id="fId">
 
         <label class="field">
-          <span>Sala</span>
+          <span>Room</span>
           <div class="seg" id="fRoomSeg">
             <button type="button" class="seg-r1" data-room="1">JBS 1</button>
             <button type="button" class="seg-r2" data-room="2">JBS 2</button>
@@ -61,42 +61,42 @@
         </label>
 
         <label class="field">
-          <span>Nome da pessoa <b>*</b></span>
-          <input type="text" id="fName" required placeholder="Quem marcou a reunião" maxlength="80">
+          <span>Booked by (name) <b>*</b></span>
+          <input type="text" id="fName" required placeholder="Person booking the meeting" maxlength="80">
         </label>
 
         <div class="row">
           <label class="field">
-            <span>Quantas pessoas <b>*</b></span>
+            <span>Number of people <b>*</b></span>
             <div class="stepper">
-              <button type="button" id="fPeopleMinus" aria-label="Menos">−</button>
+              <button type="button" id="fPeopleMinus" aria-label="Fewer">−</button>
               <input type="number" id="fPeople" min="1" max="99" value="2" required inputmode="numeric">
-              <button type="button" id="fPeoplePlus" aria-label="Mais">+</button>
+              <button type="button" id="fPeoplePlus" aria-label="More">+</button>
             </div>
           </label>
           <label class="field">
-            <span>Unidade de Negócio <b>*</b></span>
-            <input type="text" id="fBu" list="buList" required placeholder="Ex.: Friboi, Seara…" maxlength="60">
+            <span>Business Unit <b>*</b></span>
+            <input type="text" id="fBu" list="buList" required placeholder="e.g. Friboi, Seara…" maxlength="60">
             <datalist id="buList"></datalist>
           </label>
         </div>
 
         <label class="field">
-          <span>Com quem / empresa <small>(opcional)</small></span>
-          <input type="text" id="fCompany" placeholder="Cliente, parceiro ou empresa" maxlength="100">
+          <span>Meeting with / company <small>(optional)</small></span>
+          <input type="text" id="fCompany" placeholder="Client, partner or company" maxlength="100">
         </label>
 
         <div class="row">
           <label class="field">
-            <span>Data <b>*</b></span>
+            <span>Date <b>*</b></span>
             <select id="fDate" required></select>
           </label>
           <label class="field">
-            <span>Início <b>*</b></span>
+            <span>Start <b>*</b></span>
             <select id="fStart" required></select>
           </label>
           <label class="field">
-            <span>Fim <b>*</b></span>
+            <span>End <b>*</b></span>
             <select id="fEnd" required></select>
           </label>
         </div>
@@ -104,10 +104,10 @@
         <p class="form-error hidden" id="formError"></p>
 
         <div class="modal-actions">
-          <button type="button" class="btn btn-danger hidden" id="btnDelete">Excluir</button>
+          <button type="button" class="btn btn-danger hidden" id="btnDelete">Delete</button>
           <span class="spacer"></span>
-          <button type="button" class="btn btn-ghost" id="btnCancel">Cancelar</button>
-          <button type="submit" class="btn btn-primary" id="btnSave">Salvar</button>
+          <button type="button" class="btn btn-ghost" id="btnCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btnSave">Save</button>
         </div>
       </form>
     </div>
@@ -116,12 +116,12 @@
   <!-- Confirmação de arraste -->
   <div class="modal hidden" id="confirmModal" role="dialog" aria-modal="true">
     <div class="modal-card modal-small">
-      <h2>Mover reunião?</h2>
+      <h2>Move meeting?</h2>
       <p id="confirmText"></p>
       <div class="modal-actions">
         <span class="spacer"></span>
-        <button type="button" class="btn btn-ghost" id="confirmNo">Não</button>
-        <button type="button" class="btn btn-primary" id="confirmYes">Sim, mover</button>
+        <button type="button" class="btn btn-ghost" id="confirmNo">No</button>
+        <button type="button" class="btn btn-primary" id="confirmYes">Yes, move</button>
       </div>
     </div>
   </div>
@@ -130,8 +130,8 @@
 
   <footer class="footbar">
     <button class="btn btn-ghost btn-sm" id="btnExport">⬇ Backup</button>
-    <label class="btn btn-ghost btn-sm">⬆ Restaurar<input type="file" id="fileImport" accept="application/json" hidden></label>
-    <span class="hint">Toque em um horário livre para marcar · Toque na reunião para editar · Segure e arraste para mover</span>
+    <label class="btn btn-ghost btn-sm">⬆ Restore<input type="file" id="fileImport" accept="application/json" hidden></label>
+    <span class="hint">Tap a free slot to book · Tap a meeting to edit · Press and hold to move</span>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>

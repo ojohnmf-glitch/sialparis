@@ -14,8 +14,9 @@
   const LONG_PRESS_MS = 350;
   const STORAGE_KEY = 'sial2026-meetings-v1';
   const ROOMS = { 1: 'JBS 1', 2: 'JBS 2' };
-  const DEFAULT_BUS = ['Friboi', 'Seara', 'Swift', 'JBS Couros', 'JBS Novos Negócios', 'Pilgrim\'s', 'JBS USA', 'JBS Austrália', 'Alimentos Preparados', 'Friboi Internacional'];
-  const DOW = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const DEFAULT_BUS = ['Friboi', 'Seara', 'Swift', 'JBS Leather', 'JBS New Business', 'Pilgrim\'s', 'JBS USA', 'JBS Australia', 'Prepared Foods', 'Friboi International'];
+  const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const DOW_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   // ---------- Estado ----------
   let meetings, selectedDay, roomFilter = 'all', listMode = false;
@@ -25,8 +26,8 @@
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const pad = (n) => String(n).padStart(2, '0');
   const fmtTime = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
-  const fmtDate = (iso) => { const d = new Date(iso + 'T12:00:00'); return `${DOW[d.getDay()]} ${d.getDate()}/${pad(d.getMonth() + 1)}`; };
-  const fmtDateLong = (iso) => { const d = new Date(iso + 'T12:00:00'); return `${['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][d.getDay()]}, ${d.getDate()} de outubro`; };
+  const fmtDate = (iso) => { const d = new Date(iso + 'T12:00:00'); return `${DOW[d.getDay()]}, Oct ${d.getDate()}`; };
+  const fmtDateLong = (iso) => { const d = new Date(iso + 'T12:00:00'); return `${DOW_LONG[d.getDay()]}, October ${d.getDate()}`; };
   const hourPx = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hour'));
   const minToPx = (m) => (m - DAY_START) / 60 * hourPx();
   const pxToMin = (px) => DAY_START + px / hourPx() * 60;
@@ -59,7 +60,7 @@
     async load() {
       const { data, error } = await sb.from('meetings').select('*');
       if (error) throw error;
-      setSync('ok', 'sincronizado'); return data.map(fromRow);
+      setSync('ok', 'synced'); return data.map(fromRow);
     },
     async upsert(m) {
       const { error } = await sb.from('meetings').upsert(toRow(m));
@@ -76,7 +77,7 @@
     },
     subscribe(onChange) {
       sb.channel('meetings-live').on('postgres_changes', { event: '*', schema: 'public', table: 'meetings' }, onChange)
-        .subscribe((status) => { if (status === 'SUBSCRIBED') setSync('ok', 'sincronizado · ao vivo'); });
+        .subscribe((status) => { if (status === 'SUBSCRIBED') setSync('ok', 'synced · live'); });
       setInterval(onChange, 30 * 1000); // rede de segurança caso o tempo real caia
     },
   };
@@ -84,12 +85,12 @@
 
   async function refresh() {
     try { meetings = await store.load(); render(); }
-    catch (e) { console.error(e); setSync('err', 'sem conexão'); toast('Não foi possível carregar a agenda. Verifique a internet.'); }
+    catch (e) { console.error(e); setSync('err', 'offline'); toast('Could not load the schedule. Check your connection.'); }
   }
   function friendlyError(e) {
     const msg = String(e && (e.message || e)) || '';
-    if (/meetings_no_overlap|exclusion/i.test(msg)) return 'Esse horário acabou de ser ocupado por outro aparelho.';
-    return 'Não foi possível salvar. Verifique a internet e tente de novo.';
+    if (/meetings_no_overlap|exclusion/i.test(msg)) return 'That slot was just booked from another device.';
+    return 'Could not save. Check your connection and try again.';
   }
   function conflict(m) {
     return meetings.find((o) => o.id !== m.id && o.room === m.room && o.date === m.date && o.start < m.end && m.start < o.end);
@@ -115,7 +116,7 @@
       const n = meetings.filter((m) => m.date === d).length;
       return `<button class="day-tab ${d === selectedDay ? 'is-active' : ''} ${d === t ? 'is-today' : ''}" data-day="${d}">
         <span class="dow">${DOW[dt.getDay()]}</span><span class="dom">${dt.getDate()}</span>
-        ${n ? `<span class="dow">${n} reun.</span>` : ''}</button>`;
+        ${n ? `<span class="dow">${n} mtg${n > 1 ? 's' : ''}</span>` : ''}</button>`;
     }).join('');
   }
 
@@ -129,7 +130,7 @@
 
     header.innerHTML = '<div></div>' + rooms.map((r) => {
       const n = meetings.filter((m) => m.date === selectedDay && m.room === r).length;
-      return `<div class="room-head r${r}">${ROOMS[r]}<small>${n ? `${n} reunião${n > 1 ? 'ões' : ''}` : 'livre o dia todo'}</small></div>`;
+      return `<div class="room-head r${r}">${ROOMS[r]}<small>${n ? `${n} meeting${n > 1 ? 's' : ''}` : 'free all day'}</small></div>`;
     }).join('');
 
     let timeCol = '<div class="time-col">';
@@ -147,7 +148,7 @@
         html += `<div class="event r${r} ${h < 46 ? 'short' : ''} ${isPast(mt) ? 'past' : ''}" data-id="${mt.id}" style="top:${minToPx(mt.start)}px;height:${h - 3}px">
           <span class="ev-time">${fmtTime(mt.start)} – ${fmtTime(mt.end)}</span>
           <span class="ev-name">${esc(mt.name)}</span>
-          <span class="ev-meta">${esc(mt.bu)} · ${mt.people} ${mt.people > 1 ? 'pessoas' : 'pessoa'}${mt.company ? ' · ' + esc(mt.company) : ''}</span>
+          <span class="ev-meta">${esc(mt.bu)} · ${mt.people} ${mt.people > 1 ? 'people' : 'person'}${mt.company ? ' · ' + esc(mt.company) : ''}</span>
         </div>`;
       });
       return html + '</div>';
@@ -167,11 +168,11 @@
     $('#listView').innerHTML = `<div class="list-day-title">${fmtDateLong(selectedDay)}</div>` +
       (items.length ? items.map((m) => `
         <div class="list-item r${m.room} ${isPast(m) ? 'past' : ''}" data-id="${m.id}">
-          <div class="li-time">${fmtTime(m.start)}<small>até ${fmtTime(m.end)}</small></div>
+          <div class="li-time">${fmtTime(m.start)}<small>to ${fmtTime(m.end)}</small></div>
           <div><div class="li-name">${esc(m.name)}</div>
-            <div class="li-meta">${esc(m.bu)} · ${m.people} ${m.people > 1 ? 'pessoas' : 'pessoa'}${m.company ? ' · com ' + esc(m.company) : ''}</div></div>
+            <div class="li-meta">${esc(m.bu)} · ${m.people} ${m.people > 1 ? 'people' : 'person'}${m.company ? ' · with ' + esc(m.company) : ''}</div></div>
           <span class="li-room">${ROOMS[m.room]}</span>
-        </div>`).join('') : '<div class="list-empty">Nenhuma reunião neste dia.</div>');
+        </div>`).join('') : '<div class="list-empty">No meetings on this day.</div>');
   }
 
   function render() {
@@ -179,7 +180,7 @@
     $('#calendar').classList.toggle('hidden', listMode);
     $('#listView').classList.toggle('hidden', !listMode);
     $('#btnList').querySelector('.ico').textContent = listMode ? '▦' : '☰';
-    $('#btnList').querySelector('.long').textContent = listMode ? ' Grade' : ' Lista';
+    $('#btnList').querySelector('.long').textContent = listMode ? ' Grid' : ' List';
     if (listMode) renderList(); else renderCalendar();
   }
 
@@ -202,7 +203,7 @@
   function openForm(data) {
     fillBuList();
     const editing = !!data.id;
-    $('#modalTitle').textContent = editing ? 'Editar reunião' : 'Adicionar reunião';
+    $('#modalTitle').textContent = editing ? 'Edit meeting' : 'Add meeting';
     $('#btnDelete').classList.toggle('hidden', !editing);
     $('#fId').value = data.id || '';
     setRoom(data.room || 1);
@@ -234,11 +235,11 @@
       start: Number($('#fStart').value),
       end: Number($('#fEnd').value),
     };
-    if (!m.name) return showError('Informe o nome da pessoa.');
-    if (!m.bu) return showError('Informe a Unidade de Negócio.');
-    if (m.end <= m.start) return showError('O horário de fim precisa ser depois do início.');
+    if (!m.name) return showError('Please enter the person\'s name.');
+    if (!m.bu) return showError('Please enter the Business Unit.');
+    if (m.end <= m.start) return showError('End time must be after start time.');
     const c = conflict(m);
-    if (c) return showError(`Conflito: ${ROOMS[m.room]} já tem "${c.name}" das ${fmtTime(c.start)} às ${fmtTime(c.end)}.`);
+    if (c) return showError(`Conflict: ${ROOMS[m.room]} already has "${c.name}" from ${fmtTime(c.start)} to ${fmtTime(c.end)}.`);
     const idx = meetings.findIndex((o) => o.id === m.id);
     const prev = meetings.slice();
     if (idx >= 0) meetings[idx] = m; else meetings.push(m);
@@ -246,7 +247,7 @@
     try {
       await store.upsert(m);
       selectedDay = m.date; closeForm(); render();
-      toast(idx >= 0 ? 'Reunião atualizada' : 'Reunião adicionada');
+      toast(idx >= 0 ? 'Meeting updated' : 'Meeting added');
       if (sb) refresh();
     } catch (e) { console.error(e); meetings = prev; showError(friendlyError(e)); }
     finally { $('#btnSave').disabled = false; }
@@ -255,10 +256,10 @@
   $('#btnDelete').addEventListener('click', async () => {
     const id = $('#fId').value; const m = meetings.find((o) => o.id === id);
     if (!m) return;
-    if (!confirm(`Excluir a reunião de ${m.name} (${fmtTime(m.start)}–${fmtTime(m.end)})?`)) return;
+    if (!confirm(`Delete ${m.name}'s meeting (${fmtTime(m.start)}–${fmtTime(m.end)})?`)) return;
     const prev = meetings.slice();
     meetings = meetings.filter((o) => o.id !== id);
-    try { await store.remove(id); closeForm(); render(); toast('Reunião excluída'); }
+    try { await store.remove(id); closeForm(); render(); toast('Meeting deleted'); }
     catch (e) { console.error(e); meetings = prev; showError(friendlyError(e)); }
   });
   $('#btnClose').addEventListener('click', closeForm);
@@ -362,14 +363,14 @@
     if (!d.moved || !d.target || (d.target.room === d.m.room && d.target.start === d.m.start)) { render(); return; }
     const moved = { ...d.m, room: d.target.room, start: d.target.start, end: d.target.start + (d.m.end - d.m.start) };
     const c = conflict(moved);
-    if (c) { render(); toast(`Horário ocupado em ${ROOMS[moved.room]} por ${c.name}`); return; }
-    $('#confirmText').innerHTML = `<b style="color:inherit">${esc(d.m.name)}</b> vai para <strong>${ROOMS[moved.room]}</strong>, ${fmtTime(moved.start)} – ${fmtTime(moved.end)}.`;
+    if (c) { render(); toast(`Slot in ${ROOMS[moved.room]} is taken by ${c.name}`); return; }
+    $('#confirmText').innerHTML = `<b style="color:inherit">${esc(d.m.name)}</b> will move to <strong>${ROOMS[moved.room]}</strong>, ${fmtTime(moved.start)} – ${fmtTime(moved.end)}.`;
     $('#confirmModal').classList.remove('hidden');
     $('#confirmYes').onclick = async () => {
       const idx = meetings.findIndex((o) => o.id === moved.id); const prev = meetings[idx];
       meetings[idx] = moved;
       $('#confirmModal').classList.add('hidden');
-      try { await store.upsert(moved); render(); toast('Reunião movida'); if (sb) refresh(); }
+      try { await store.upsert(moved); render(); toast('Meeting moved'); if (sb) refresh(); }
       catch (e) { console.error(e); meetings[idx] = prev; render(); toast(friendlyError(e)); }
     };
     $('#confirmNo').onclick = () => { $('#confirmModal').classList.add('hidden'); render(); };
@@ -382,18 +383,18 @@
   $('#btnExport').addEventListener('click', () => {
     const blob = new Blob([JSON.stringify(meetings, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = `agenda-sial-${todayIso()}.json`; a.click(); URL.revokeObjectURL(a.href);
+    a.download = `sial-schedule-${todayIso()}.json`; a.click(); URL.revokeObjectURL(a.href);
   });
   $('#fileImport').addEventListener('change', async (e) => {
     const f = e.target.files[0]; if (!f) return;
     try {
       const data = JSON.parse(await f.text());
       if (!Array.isArray(data)) throw new Error();
-      if (!confirm(`Substituir a agenda atual por ${data.length} reunião(ões) do arquivo?`)) return;
+      if (!confirm(`Replace the current schedule with ${data.length} meeting(s) from this file?`)) return;
       const list = data.filter((m) => m && m.id && ROOMS[m.room] && EVENT_DAYS.includes(m.date));
-      await store.replaceAll(list); meetings = list; render(); toast('Agenda restaurada');
+      await store.replaceAll(list); meetings = list; render(); toast('Schedule restored');
       if (sb) refresh();
-    } catch (err) { console.error(err); toast('Arquivo inválido ou falha ao enviar'); }
+    } catch (err) { console.error(err); toast('Invalid file or upload failed'); }
     e.target.value = '';
   });
 
@@ -409,7 +410,7 @@
   $('#calScroll').scrollTop = minToPx(scrollTo);
   setInterval(() => { if (!listMode && !drag) renderCalendar(); }, 60 * 1000);
 
-  if (sb) setSync('', 'conectando…'); else setSync('', 'só neste aparelho');
+  if (sb) setSync('', 'connecting…'); else setSync('', 'this device only');
   refresh().then(() => store.subscribe(() => { if (!drag && $('#modal').classList.contains('hidden')) refresh(); }));
   window.addEventListener('focus', () => { if (sb) refresh(); });
 })();

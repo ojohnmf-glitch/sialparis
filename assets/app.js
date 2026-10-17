@@ -246,7 +246,7 @@
       start: Number($('#fStart').value),
       end: Number($('#fEnd').value),
     };
-    if (!m.name) return showError('Please enter the person\'s name.');
+    if (!m.name) return showError('Please enter the name of the person the meeting is for.');
     if (!m.bu) return showError('Please enter the Business Unit.');
     const c = conflict(m);
     if (c) return showError(`Conflict: ${ROOMS[m.room]} already has "${c.name}" from ${fmtTime(c.start)} to ${fmtTime(c.end)}.`);

@@ -15,6 +15,7 @@
     <div class="brand">
       <span class="brand-title">Agenda de Salas</span>
       <span class="brand-sub">SIAL Paris · 17 a 21 de outubro</span>
+      <span class="sync" id="syncStatus" title="Estado da sincronização">● só neste aparelho</span>
     </div>
 
     <nav class="days" id="dayTabs" aria-label="Dias do evento"></nav>
@@ -133,6 +134,8 @@
     <span class="hint">Toque em um horário livre para marcar · Toque na reunião para editar · Segure e arraste para mover</span>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+  <script src="assets/config.js"></script>
   <script src="assets/app.js"></script>
 </body>
 </html>

@@ -39,12 +39,57 @@
     const t = todayIso();
     return EVENT_DAYS.includes(t) ? t : EVENT_DAYS[0];
   }
-  function load() {
-    try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; }
+  // ---------- Camada de dados ----------
+  // Supabase quando configurado em assets/config.js; senão, localStorage deste aparelho.
+  const cfg = window.SIAL_CONFIG || {};
+  const sb = (cfg.supabaseUrl && cfg.supabaseKey && window.supabase)
+    ? window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey) : null;
+  const toRow = (m) => ({ id: m.id, room: m.room, date: m.date, start_min: m.start, end_min: m.end, name: m.name, people: m.people, bu: m.bu, company: m.company, updated_at: new Date().toISOString() });
+  const fromRow = (r) => ({ id: r.id, room: Number(r.room), date: r.date, start: Number(r.start_min), end: Number(r.end_min), name: r.name, people: Number(r.people), bu: r.bu || '', company: r.company || '' });
+  function setSync(state, text) { const el = $('#syncStatus'); if (!el) return; el.className = 'sync ' + state; el.textContent = '● ' + text; }
+
+  const localStore = {
+    async load() { try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } },
+    async upsert(m) { localStorage.setItem(STORAGE_KEY, JSON.stringify(meetings)); return m; },
+    async remove() { localStorage.setItem(STORAGE_KEY, JSON.stringify(meetings)); },
+    async replaceAll(list) { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); },
+    subscribe() {},
+  };
+  const remoteStore = {
+    async load() {
+      const { data, error } = await sb.from('meetings').select('*');
+      if (error) throw error;
+      setSync('ok', 'sincronizado'); return data.map(fromRow);
+    },
+    async upsert(m) {
+      const { error } = await sb.from('meetings').upsert(toRow(m));
+      if (error) throw error; return m;
+    },
+    async remove(id) {
+      const { error } = await sb.from('meetings').delete().eq('id', id);
+      if (error) throw error;
+    },
+    async replaceAll(list) {
+      const { error: e1 } = await sb.from('meetings').delete().neq('id', '');
+      if (e1) throw e1;
+      if (list.length) { const { error: e2 } = await sb.from('meetings').insert(list.map(toRow)); if (e2) throw e2; }
+    },
+    subscribe(onChange) {
+      sb.channel('meetings-live').on('postgres_changes', { event: '*', schema: 'public', table: 'meetings' }, onChange)
+        .subscribe((status) => { if (status === 'SUBSCRIBED') setSync('ok', 'sincronizado · ao vivo'); });
+      setInterval(onChange, 30 * 1000); // rede de segurança caso o tempo real caia
+    },
+  };
+  const store = sb ? remoteStore : localStore;
+
+  async function refresh() {
+    try { meetings = await store.load(); render(); }
+    catch (e) { console.error(e); setSync('err', 'sem conexão'); toast('Não foi possível carregar a agenda. Verifique a internet.'); }
   }
-  function save() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(meetings)); }
-    catch { toast('Não foi possível salvar neste navegador.'); }
+  function friendlyError(e) {
+    const msg = String(e && (e.message || e)) || '';
+    if (/meetings_no_overlap|exclusion/i.test(msg)) return 'Esse horário acabou de ser ocupado por outro aparelho.';
+    return 'Não foi possível salvar. Verifique a internet e tente de novo.';
   }
   function conflict(m) {
     return meetings.find((o) => o.id !== m.id && o.room === m.room && o.date === m.date && o.start < m.end && m.start < o.end);
@@ -59,7 +104,7 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.add('hidden'), 2400);
   }
 
-  meetings = load();
+  meetings = [];
   selectedDay = pickInitialDay();
 
   // ---------- Render ----------
@@ -176,7 +221,7 @@
   function closeForm() { $('#modal').classList.add('hidden'); }
   function showError(msg) { const e = $('#formError'); e.textContent = msg; e.classList.remove('hidden'); }
 
-  form.addEventListener('submit', (ev) => {
+  form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const m = {
       id: $('#fId').value || uid(),
@@ -195,16 +240,26 @@
     const c = conflict(m);
     if (c) return showError(`Conflito: ${ROOMS[m.room]} já tem "${c.name}" das ${fmtTime(c.start)} às ${fmtTime(c.end)}.`);
     const idx = meetings.findIndex((o) => o.id === m.id);
+    const prev = meetings.slice();
     if (idx >= 0) meetings[idx] = m; else meetings.push(m);
-    save(); selectedDay = m.date; closeForm(); render();
-    toast(idx >= 0 ? 'Reunião atualizada' : 'Reunião adicionada');
+    $('#btnSave').disabled = true;
+    try {
+      await store.upsert(m);
+      selectedDay = m.date; closeForm(); render();
+      toast(idx >= 0 ? 'Reunião atualizada' : 'Reunião adicionada');
+      if (sb) refresh();
+    } catch (e) { console.error(e); meetings = prev; showError(friendlyError(e)); }
+    finally { $('#btnSave').disabled = false; }
   });
 
-  $('#btnDelete').addEventListener('click', () => {
+  $('#btnDelete').addEventListener('click', async () => {
     const id = $('#fId').value; const m = meetings.find((o) => o.id === id);
     if (!m) return;
     if (!confirm(`Excluir a reunião de ${m.name} (${fmtTime(m.start)}–${fmtTime(m.end)})?`)) return;
-    meetings = meetings.filter((o) => o.id !== id); save(); closeForm(); render(); toast('Reunião excluída');
+    const prev = meetings.slice();
+    meetings = meetings.filter((o) => o.id !== id);
+    try { await store.remove(id); closeForm(); render(); toast('Reunião excluída'); }
+    catch (e) { console.error(e); meetings = prev; showError(friendlyError(e)); }
   });
   $('#btnClose').addEventListener('click', closeForm);
   $('#btnCancel').addEventListener('click', closeForm);
@@ -310,9 +365,12 @@
     if (c) { render(); toast(`Horário ocupado em ${ROOMS[moved.room]} por ${c.name}`); return; }
     $('#confirmText').innerHTML = `<b style="color:inherit">${esc(d.m.name)}</b> vai para <strong>${ROOMS[moved.room]}</strong>, ${fmtTime(moved.start)} – ${fmtTime(moved.end)}.`;
     $('#confirmModal').classList.remove('hidden');
-    $('#confirmYes').onclick = () => {
-      const idx = meetings.findIndex((o) => o.id === moved.id); meetings[idx] = moved; save();
-      $('#confirmModal').classList.add('hidden'); render(); toast('Reunião movida');
+    $('#confirmYes').onclick = async () => {
+      const idx = meetings.findIndex((o) => o.id === moved.id); const prev = meetings[idx];
+      meetings[idx] = moved;
+      $('#confirmModal').classList.add('hidden');
+      try { await store.upsert(moved); render(); toast('Reunião movida'); if (sb) refresh(); }
+      catch (e) { console.error(e); meetings[idx] = prev; render(); toast(friendlyError(e)); }
     };
     $('#confirmNo').onclick = () => { $('#confirmModal').classList.add('hidden'); render(); };
   }
@@ -332,9 +390,10 @@
       const data = JSON.parse(await f.text());
       if (!Array.isArray(data)) throw new Error();
       if (!confirm(`Substituir a agenda atual por ${data.length} reunião(ões) do arquivo?`)) return;
-      meetings = data.filter((m) => m && m.id && ROOMS[m.room] && EVENT_DAYS.includes(m.date));
-      save(); render(); toast('Agenda restaurada');
-    } catch { toast('Arquivo inválido'); }
+      const list = data.filter((m) => m && m.id && ROOMS[m.room] && EVENT_DAYS.includes(m.date));
+      await store.replaceAll(list); meetings = list; render(); toast('Agenda restaurada');
+      if (sb) refresh();
+    } catch (err) { console.error(err); toast('Arquivo inválido ou falha ao enviar'); }
     e.target.value = '';
   });
 
@@ -349,4 +408,8 @@
   const scrollTo = selectedDay === todayIso() ? clamp(nowMin() - 60, DAY_START, DAY_END) : DAY_START;
   $('#calScroll').scrollTop = minToPx(scrollTo);
   setInterval(() => { if (!listMode && !drag) renderCalendar(); }, 60 * 1000);
+
+  if (sb) setSync('', 'conectando…'); else setSync('', 'só neste aparelho');
+  refresh().then(() => store.subscribe(() => { if (!drag && $('#modal').classList.contains('hidden')) refresh(); }));
+  window.addEventListener('focus', () => { if (sb) refresh(); });
 })();

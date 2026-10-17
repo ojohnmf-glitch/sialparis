@@ -14,7 +14,7 @@
   const LONG_PRESS_MS = 350;
   const STORAGE_KEY = 'sial2026-meetings-v1';
   const ROOMS = { 1: 'JBS 1', 2: 'JBS 2' };
-  const DEFAULT_BUS = ['Friboi', 'Seara', 'Swift', 'JBS Leather', 'JBS New Business', 'Pilgrim\'s', 'JBS USA', 'JBS Australia', 'Prepared Foods', 'Friboi International'];
+  const DEFAULT_BUS = ['FRIBOI', 'JBS', 'JBS CANADA', 'JBS GLOBAL UK', 'JBS TOLEDO', 'JBS USA BEEF', 'JBS USA PORK', 'PILGRIM\'S', 'PILGRIM\'S US', 'SEARA'];
   const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const DOW_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -193,8 +193,9 @@
     $('#fDate').innerHTML = EVENT_DAYS.map((d) => `<option value="${d}">${fmtDate(d)}</option>`).join('');
   }
   function fillBuList() {
-    const set = new Set([...meetings.map((m) => m.bu).filter(Boolean), ...DEFAULT_BUS]);
-    $('#buList').innerHTML = [...set].sort().map((b) => `<option value="${esc(b)}">`).join('');
+    const cur = $('#fBu').value;
+    $('#fBu').innerHTML = '<option value="">Select…</option>' + DEFAULT_BUS.map((b) => `<option value="${esc(b)}">${esc(b)}</option>`).join('');
+    $('#fBu').value = cur;
   }
   function setRoom(r) {
     $('#fRoom').value = r;
@@ -209,6 +210,7 @@
     setRoom(data.room || 1);
     $('#fName').value = data.name || '';
     $('#fPeople').value = data.people || 2;
+    if (data.bu && !DEFAULT_BUS.includes(data.bu)) $('#fBu').insertAdjacentHTML('beforeend', `<option value="${esc(data.bu)}">${esc(data.bu)}</option>`);
     $('#fBu').value = data.bu || '';
     $('#fCompany').value = data.company || '';
     $('#fDate').value = data.date || selectedDay;
